@@ -62,6 +62,12 @@ all_sorted <- fill(all_sorted, temp)
 x <- nrow(old_data)+1
 y <- nrow(all_sorted)
 
+#Verify by using email and time of day that where we are "spitting" are similar between the two datasets
+#old_data[x-1,c(1,7)]
+#all_sorted[x-1,c(1,7)]
+
+old_data[x-1,c(1)] == all_sorted[x-1,c(1)] && old_data[x-1,c(7)] == all_sorted[x-1,c(7)]
+
 new_data <- all_sorted[x:y,]
 
 #Adding State and County

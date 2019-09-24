@@ -1,3 +1,4 @@
+#Only use when working with a brand new dataset. In adding data for an ongoing project, use the "data_append" file, which will reduce processing time by only processing the additional data, rather than the whole set.
 #Load packages
 source("packages.R")
 #install.packages("plotly")

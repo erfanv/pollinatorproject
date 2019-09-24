@@ -1,5 +1,5 @@
 ---
-title: "pollinator_analyses"
+title: "Southern USA Citizen Science Project Pollinator Analyses"
 author: "Erfan Vafaie"
 date: "9/24/2019"
 output:
@@ -17,28 +17,122 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
+library(knitr)
 
-```
-#Initialization
-First, let's import the data and take a look at it!
-```{r dataimport, include=FALSE}
+#install.packages("kableExtra")
+library(kableExtra)
+source("packages.R")
+
+#load in data
 data <- read.csv("data.csv",header=TRUE)
-data
+
+#Our custom pie function
+pie2 <- function (x, labels = names(x), edges = 200, radius = 0.8, clockwise = FALSE, 
+          init.angle = if (clockwise) 90 else 0, density = NULL, angle = 45, 
+          col = NULL, border = NULL, lty = NULL, main = NULL, ...) 
+{
+  if (!is.numeric(x) || any(is.na(x) | x < 0)) 
+    stop("'x' values must be positive.")
+  if (is.null(labels)) 
+    labels <- as.character(seq_along(x))
+  else labels <- as.graphicsAnnot(labels)
+  x <- c(0, cumsum(x)/sum(x))
+  dx <- diff(x)
+  nx <- length(dx)
+  plot.new()
+  pin <- par("pin")
+  xlim <- ylim <- c(-1, 1)
+  if (pin[1L] > pin[2L]) 
+    xlim <- (pin[1L]/pin[2L]) * xlim
+  else ylim <- (pin[2L]/pin[1L]) * ylim
+  dev.hold()
+  on.exit(dev.flush())
+  plot.window(xlim, ylim, "", asp = 1)
+  if (is.null(col)) 
+    col <- if (is.null(density)) 
+      c("white", "lightblue", "mistyrose", "lightcyan", 
+        "lavender", "cornsilk")
+  else par("fg")
+  if (!is.null(col)) 
+    col <- rep_len(col, nx)
+  if (!is.null(border)) 
+    border <- rep_len(border, nx)
+  if (!is.null(lty)) 
+    lty <- rep_len(lty, nx)
+  angle <- rep(angle, nx)
+  if (!is.null(density)) 
+    density <- rep_len(density, nx)
+  twopi <- if (clockwise) 
+    -2 * pi
+  else 2 * pi
+  t2xy <- function(t) {
+    t2p <- twopi * t + init.angle * pi/180
+    list(x = radius * cos(t2p), y = radius * sin(t2p))
+  }
+  for (i in 1L:nx) {
+    n <- max(2, floor(edges * dx[i]))
+    P <- t2xy(seq.int(x[i], x[i + 1], length.out = n))
+    polygon(c(P$x, 0), c(P$y, 0), density = density[i], angle = angle[i], 
+            border = border[i], col = col[i], lty = lty[i])
+    P <- t2xy(mean(x[i + 0:1]))
+    lab <- as.character(labels[i])
+    if (!is.na(lab) && nzchar(lab)) {
+      lines(c(1, 1.35) * P$x, c(1, 1.35) * P$y)
+      text(1.5 * P$x, 1.5 * P$y, labels[i], xpd = TRUE, 
+           adj = ifelse(P$x < 0, 1, 0), ...)
+    }
+  }
+  title(main = main, ...)
+  invisible(NULL)
+}
 ```
+#Introduction
+This data set is a summary of data collected by master gardeners, master naturalists, gardeners, students, and other pollinator enthusiasts in the Southern USA, as a part of a citizen science project. For details on the method of data collection, visit <a href="https://sixleggedaggie.com/pollinator-project" target="_blank">the pollinator project webpage</a>
 
+The data summarized below is for data collected between `r data[1,1]` and `r data[nrow(data),1]`. 
 
-## 
-
-```{r cars}
-summary(cars)
+```{r dataimport, include=FALSE}
+#Data with full taxonomic information
+fulltax <- data %>%
+  filter(Taxonomic.status!="")
 ```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+First, let's take a look at a good part of the dataset (first 50 rows). This dataset includes a total of `r nrow(data)` observations and `r length(data)` columns of information. That's a whole lot of data to go through - feel free to peruse through it below.
+```{r fulldataset, echo=FALSE}
+data[1:50,]
 ```
+A few columns explained for your convenience:
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+* __student_status:__ We had some students from a few schools join the citizen science project. We wanted to be able to separate out student from non-student data, if needed, so this category identifies observations made by students. 
+* __firstobs:__ Certain pieces of information did not have to be repeated if multiple simultaneous observations were being conducted. For example, we didn't ask for coordinates, temperature, or the submitters email if they were submitting several observations within an hour.
+* __loclat__: The latitude of where the observation was made
+* __loclong__: The longitude of where the observation was made
+* __latname and cultivar__ : The latin name and cultivar of plant being observed, assuming it was known. This is information entered by the user, which was then cross-checked using <a href="https://theplantlist.org" target="_blank">theplantlist.org</a>. Information on that provided in later column(s).
+* __bloom__ : A percentage rating of how much of the plant was in bloom.
+    + 0 = Less than 25%
+    + 1 = Between 25 - 50%
+    + 2 = Between 51 - 75%
+    + 3 = More than 75%
+* __colors__: The next several columns refer to the colors of the flowers. Users could check multiple colors, as flowers could potentially belong to more than one category. Responses are recorded as "1" (that color is present) or "0" (color is not present). The colors are self-explanatory, with a few exceptions:
+    + blue = blue/cyan
+    + purp = purple/indigo/violet
+    + whitepink = white/pink
+* __largebee to butterflies__: The total number of each of those types of pollinators seen during the 60-second observation. Refer to the <a href=https://sixleggedaggie.com/pollinator-project" target="_blank">pollinator project website</a> for more details on the categories. 
+* __Family and New.Genus:__ These two values were automatically generated by comparing the "latname" column against the <a href="https://theplantlist.org" target="_blank">theplantlist.org</a> database, and returning closest matches. Where there is not a good match, the original latname is simply echoed back into the New.Genus column and the __Taxonomic.Status__ is returned back as anything but "Approved".
+
+##Table 1.
+Below is the full list of plant families and frequency of observations, where the actual latin name was verified by theplantlist.org. The total number of observations where the latin name was verified is `r nrow(fulltax)` out of the total `r nrow(data)`.
+```{r basicanalytics, echo=FALSE}
+families <- as.data.frame(table(fulltax$Family))
+names(families) <- c("Plant_Family","Frequency_of_Observations")
+families <- families[-1,]
+
+for(i in 1:nrow(families)){
+  families$urls[i] <- paste0("https://en.wikipedia.org/wiki/",families[i,1])
+}
+
+families <- families %>% mutate(family=paste("<a href=\"",urls,"\">",Plant_Family,"</a>",sep="")) %>% 
+select(family,Frequency_of_Observations)
+
+kable(families, format = "html", escape = FALSE, digits=2, caption = "Table 1. Full list of plant families and frequency of observations that were reported during the project") %>%
+  kable_styling(fixed_thead = T, bootstrap_options = c("striped", "hover", "responsive"), full_width = F)
+```
