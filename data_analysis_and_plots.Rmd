@@ -1,0 +1,44 @@
+---
+title: "pollinator_analyses"
+author: "Erfan Vafaie"
+date: "9/24/2019"
+output:
+  html_document:
+    collapsed: yes
+    smooth_scroll: yes
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+    df_print: paged
+  word_document:
+    toc: yes
+    toc_depth: '3'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+```
+#Initialization
+First, let's import the data and take a look at it!
+```{r dataimport, include=FALSE}
+data <- read.csv("data.csv",header=TRUE)
+data
+```
+
+
+## 
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

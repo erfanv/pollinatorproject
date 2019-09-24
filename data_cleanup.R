@@ -12,31 +12,14 @@ library("Taxonstand")
 #Import the raw data
 rawdata <- read.csv("/Volumes/GoogleDrive/My\ Drive/Projects/Southern\ Region\ Pollinator\ CS\ Project/r-analysis/raw_data.csv", header=TRUE)
 
-#check import
-head(rawdata)
-
-#check data summary
-summary(rawdata)
-
 #Provide new easy-to-write names for each column. Note that flower colors have changed, as the 'value' associated with the user input was actually incorrect in the original survey. True color values are as follows (data value = user selected value): blue_purple = red, white_pink = Orange, yellow_orange = Yellow, red = Green, green = Blue/Cyan, purple_indigo_ = Purple/Indigo/Violet, white = White/Pink.
 names(rawdata) <- c("start","end","un","did","student_status","firstobs","email","loc","loclat","loclong","localt","locprec","time","temp","latname","cultivar","bloom","red","orange","yellow","green","blue","purp","whitepink","largebee","mediumbee","smallblbee","smallgbee","nonbeewasp","hoverflies","butterflies","photo","feedback","version","metaid","id","uuid","subtime","tags","notes","versionx","duration","submittedby","totalmedia","mediacount","mediareceived","xformid")
-names(rawdata)
-
-#Total rows of data
-dim(rawdata)[1]
 
 #Let's remove any "test" rows. Test rows inputted by Erfan and Mike Merchant. Also, several of the first rows were test input.
 #View(rawdata)
 
 #Remove rows 1 - 8
 rawdata <- rawdata[-c(1:8),]
-
-#Check for data points where hostplantselec is anything other than n/a, as it should be.
-rawdata[rawdata$hostplantselec!="n/a",]
-
-#check dimensions of latnames, i.e. number of unique values typed in for latin names.
-dim(table(rawdata$latname))
-dim(table(rawdata$cultivar))
 
 #convert all characters in latin name and cultivar to lower case
 rawdata$latname <- tolower(rawdata$latname)
@@ -55,7 +38,6 @@ col <- c("red","orange","yellow","green","blue","purp","whitepink")
 rawdata[,col] <- apply(rawdata[,col], 2, function(x) as.integer(as.logical(x)))
 apply(rawdata[,col], 2, function(x) sum(x, na.rm=TRUE))
 
-
 #Change all pollinator counts to numeric
 pol <- c("largebee","mediumbee","smallblbee","smallgbee","nonbeewasp","hoverflies","butterflies")
 
@@ -63,12 +45,6 @@ rawdata[,pol] <- apply(rawdata[,pol], 2, function(x) as.numeric(as.character(x),
 apply(rawdata[,pol], 2, function(x) sum(x, na.rm=TRUE))
 
 attach(rawdata)
-
-#create table of latin names
-dim(table(latname))
-dim(table(rawdata$cultivar))
-table(latname)
-table(cultivar)
 
 #If latname is unknown (i.e. latname == "unknown"), then simply make the latname the same as cultivar, since people sometimes put the common name under cultivar.
 rawdata[rawdata == "unknown"] <- NA
@@ -152,6 +128,12 @@ write.csv(raw_sorted, "cleaned_data.csv", row.names=FALSE)
 raw_public <- raw_sorted %>%
   select(start,end,did,student_status,firstobs,loclat,loclong,time,temp,latname,cultivar,bloom,red,orange,yellow,green,blue,purp,whitepink,largebee,mediumbee,smallblbee,smallgbee,nonbeewasp,hoverflies,butterflies,feedback,state,county, Family, New.Genus, New.Species, Authority, Taxonomic.status)
 
+write.csv(raw_public, "data.csv", row.names=FALSE)
+
+
+
+
+#MOVE ALL BELOW TO DATA_ANALYSIS_AND_PLOTS
 
 #Create a quick pie chart
 ?pie()
@@ -231,7 +213,6 @@ latnames <- sort(latnames)
 View(latnames)
 
 write.csv(latnames,"/Volumes/GoogleDrive/My\ Drive/Projects/Southern\ Region\ Pollinator\ CS\ Project/r-analysis/latnames.csv")
-#fulltaxon <- read.csv("/Volumes/GoogleDrive/My\ Drive/Projects/Southern\ Region\ Pollinator\ CS\ Project/r-analysis/fulltax.csv")
 
 fulltaxon <- TPL(rawdata$latname, corr = TRUE, diffchar = 2, max.distance = 1)
 
