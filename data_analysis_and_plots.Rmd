@@ -25,6 +25,8 @@ knitr::opts_chunk$set(echo = FALSE)
 library(knitr)
 library(plotly)
 #install.packages("kableExtra")
+#install.packages("RCurl")
+library(RCurl)
 library(kableExtra)
 source("packages.R")
 
@@ -178,4 +180,8 @@ pgenus <- fulltax[1:20,] %>%
          yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
 
 pgenus
+```
+
+```{r uploadfile, include=FALSE}
+source("file_upload.R")
 ```
