@@ -2,10 +2,11 @@
 #load packages
 source("packages.R")
 library("Taxonstand")
+library("stringr")
 
 old_data <- read.csv("cleaned_data.csv", header=TRUE)
+
 #Subset old data for the purpose of practice/demonstration
-old_data <- old_data[1:7000,]
 all_data <- read.csv("raw_data.csv",header=TRUE)
 
 #Provide new easy-to-write names for each column. Note that flower colors have changed, as the 'value' associated with the user input was actually incorrect in the original survey. True color values are as follows (data value = user selected value): blue_purple = red, white_pink = Orange, yellow_orange = Yellow, red = Green, green = Blue/Cyan, purple_indigo_ = Purple/Indigo/Violet, white = White/Pink.
@@ -72,8 +73,8 @@ new_data <- all_sorted[x:y,]
 
 #Adding State and County
 #Convert coordinate data to numeric
-new_data[,9] <- as.numeric(as.character(new_data[,9]))
-new_data[,10] <- as.numeric(as.character(new_data[,10]))
+new_data$loclat <- as.numeric(as.character(new_data$loclat))
+new_data$loclong <- as.numeric(as.character(new_data$loclong))
 
 #Some of the longitude data is positive (i.e. "E" instead of "W"), putting some of these locations in China rather than Texas... Need to change all positive longitude points to negative.
 
@@ -98,14 +99,14 @@ latlong2county <- function(pointsDF) {
   IDs <- sapply(strsplit(counties$names, ":"), function(x) x[1])
   counties_sp <- map2SpatialPolygons(counties, IDs=IDs,
                                      proj4string=CRS("+proj=longlat +datum=WGS84"))
-  
-  # Convert pointsDF to a SpatialPoints object 
-  pointsSP <- SpatialPoints(pointsDF, 
+
+  # Convert pointsDF to a SpatialPoints object
+  pointsSP <- SpatialPoints(pointsDF,
                             proj4string=CRS("+proj=longlat +datum=WGS84"))
-  
-  # Use 'over' to get _indices_ of the Polygons object containing each point 
+
+  # Use 'over' to get _indices_ of the Polygons object containing each point
   indices <- over(pointsSP, counties_sp)
-  
+
   # Return the county names of the Polygons object containing each point
   countyNames <- sapply(counties_sp@polygons, function(x) x@ID)
   countyNames[indices]
@@ -116,6 +117,28 @@ new_data$statecounty <- latlong2county(new_data[,10:9])
 #Split State and County
 new_data <- separate(data=new_data, col = statecounty, into = c("state","county"))
 
+#Before checking and pulling information on all of the latnames from theplantlist.org database, lets use a manual list produced by Danielle Dunn to correct some of the latnames
+corrected_latnames <- read.csv("corrected_latnames.csv", header=TRUE)
+corrected_latnames$Incorrect <- as.character(corrected_latnames$Incorrect)
+corrected_latnames$Correct <- as.character(corrected_latnames$Correct)
+
+old_data$latname <- as.character(old_data$latname)
+new_data$latname <- as.character(new_data$latname)
+
+all <- vector()
+for(i in 1:length(corrected_latnames$Incorrect)){
+  y <- new_data$latname[new_data$latname %in% corrected_latnames$Incorrect[i]]
+  all <- c(all,y)
+}
+
+#How many corrections were made?
+length(all)
+
+#Make corrections
+for(i in 1:length(corrected_latnames$Incorrect)){
+  new_data$latname[new_data$latname %in% corrected_latnames$Incorrect[i]] <- corrected_latnames$Correct[i]
+}
+
 #Now let's verify all plant taxonomic information, and add the data from theplantlist.org
 all_sorted_fulltax <- TPL(new_data$latname, corr = TRUE, diffchar = 2, max.distance = 1)
 
@@ -123,22 +146,115 @@ new_data <- cbind(new_data,all_sorted_fulltax)
 
 complete_set <- rbind(new_data,old_data)
 
+#Some of the data is only to genus level. We want to still collect Family and Genus-level information from those observations. We can do that by searching for any latnames with "sp." in them, then match the first word (genus) from that observation with a complete observation from the dataset and copy over the Family and Genus.
+
+#complete_set <- new_data
+complete_set$latname[str_detect(complete_set$latname, coll("sp."))]
+length(complete_set$latname[str_detect(complete_set$latname, coll("sp."))])
+
+#Make a dataframe of all the genus-only observations in the dataset
+genus_only <- complete_set$latname[str_detect(complete_set$latname, coll("sp."))]
+genus_only <- unique(genus_only)
+genus_only <- genus_only[!is.na(genus_only)]
+Family <- vector("character",length(genus_only))
+New.Genus <- vector("character",length(genus_only))
+New.Taxonomic.status <- vector("character",length(genus_only))
+
+genus_only <- as.data.frame(cbind(genus_only, Family, New.Genus, New.Taxonomic.status))
+genus_only$genus_only <- str_to_sentence(genus_only$genus_only)
+genus_only$New.Genus <- word(genus_only$genus_only, 1)
+
+full_tax_unique <- complete_set %>%
+  select(New.Genus, Family, New.Taxonomic.status) %>%
+  filter(New.Taxonomic.status=="Accepted") %>%
+  unique(.)
+
+
+#full_tax_unique$New.Genus[full_tax_unique$New.Genus==word(genus_only$genus_only[1], 1)]
+#full_tax_unique$New.Genus[full_tax_unique$New.Genus==word(genus_only$genus_only[1], 1)]
+#full_tax_unique$New.Genus[full_tax_unique$New.Genus==word(genus_only$genus_only[1], 1)]
+
+#full_tax_unique[full_tax_unique$New.Genus=="lantana",]
+merged_fam_genus <- merge(genus_only, full_tax_unique, by = "New.Genus", all.x=TRUE)
+merged_fam_genus <- merged_fam_genus %>%
+  select(New.Genus, Family.y, New.Taxonomic.status.y) %>%
+  filter(New.Taxonomic.status.y=="Accepted")
+names(merged_fam_genus) <- c("New.Genus","Family","New.Taxonomic.status")
+
+#Total entries with lantana in the genus
+length(complete_set$New.Genus[str_detect(complete_set$latname, coll("lantana"))])
+
+#Total entries with lantana in the genus where the taxonomic status is listed as "Accepted".
+length(complete_set$New.Genus[str_detect(complete_set$latname, coll("lantana")) & complete_set$Taxonomic.status=="Accepted"])
+
+complete_set$genus_and_family <- "No"
+complete_set$genus_and_family <- factor(complete_set$genus_and_family,
+       levels = c("No","Yes"),
+       labels = c("No","Yes"))
+
+complete_set$genus_and_family[complete_set$New.Taxonomic.status=="Accepted"] <- "Yes"
+old_correct <- length(complete_set$genus_and_family[complete_set$New.Taxonomic.status=="Accepted"])
+
+#One major way to correct our data - use the full_tax_unique to populate any missing genus and family data from our complete dataset
+
+#if genus_and_family==No, then merge fulltaxunique$family -> complete$family and fulltaxonunique$genus -> complete$genus and genus_and_Family<-"yes"
+complete_set$New.Genus <- tolower(complete_set$New.Genus)
+full_tax_unique$New.Genus <- tolower(full_tax_unique$New.Genus)
+full_tax_unique$Family <- as.character(full_tax_unique$Family)
+full_tax_unique$New.Taxonomic.status <- as.character(full_tax_unique$New.Taxonomic.status)
+
+
+complete_set <- complete_set %>%
+  left_join(full_tax_unique, by = "New.Genus")
+
+complete_set$New.Taxonomic.status.y[is.na(complete_set$New.Taxonomic.status.y)] <- "Incomplete"
+
+new_correct <- length(complete_set$genus_and_family[complete_set$New.Taxonomic.status.y=="Accepted"])
+
+#Number of "corrections" made to taxonomic data, by adding in genus and family data.
+new_correct - old_correct
+
+complete_set$genus_and_family[complete_set$New.Taxonomic.status.y=="Accepted" & !is.na(complete_set$Family.y)] <- "Yes"
+
+complete_set <- complete_set[,-which(names(complete_set) %in% c("New.Taxonomic.status.x","Family.x"))]
+
+#List of all new plant families.
+table(complete_set$Family.y)
+
+names(complete_set)[names(complete_set)=="Family.y"] <- "Family"
+names(complete_set)[names(complete_set)=="New.Taxonomic.status.y"] <- "New.Taxonomic.status"
+
+names(new_data)
+
+
 #A bit more data cleanup! Appears to be some bee counts that may be erroneous. In this case, we're removing any numbers above 60 or below 0 for pollinator counts.
 #Also create a boxplot to quickly view any anomolies
 boxplot(complete_set[25:31])
+boxplot(complete_set$temp)
 complete_set$mediumbee[complete_set$mediumbee>60] <- NA
 complete_set$mediumbee[complete_set$mediumbee<0] <- NA
 complete_set$largebee[complete_set$largebee>60] <- NA
 complete_set$nonbeewasp[complete_set$nonbeewasp>60] <- NA
 complete_set$hoverflies[complete_set$hoverflies<0] <- NA
 complete_set$butterflies[complete_set$butterflies<0] <- NA
+complete_set$temp[complete_set$temp>150] <- NA
+complete_set$temp[complete_set$temp<50] <- NA
 
 boxplot(complete_set[25:31])
 
+#Let's split the "end" time down by year, month, date and hour
+complete_set <- transform(complete_set, end_year = substr(end,1,4), end_month = substr(end,6,7), end_date = substr(end,9,10), end_time = substr(end,12,19))
+complete_set <- transform(complete_set, end_full_date = as.Date(paste(end_year,end_month,end_date,sep="-")))
+complete_set <- transform(complete_set, end_week_num = strftime(end_full_date, format = "%V"))
+
 write.csv(complete_set, "cleaned_data.csv", row.names=FALSE)
 
+#write an archived version as well, in case of overwrite
+write.csv(complete_set, paste("archived/cleaned_data",format(Sys.time(), "%m-%d-%Y"),".csv",sep=""), row.names=FALSE)
+
+names(complete_set)
 #Save data file after unnecessary columns are removed, including people's emails
 raw_public <- complete_set %>%
-  select(start,end,did,student_status,firstobs,loclat,loclong,time,temp,latname,cultivar,bloom,red,orange,yellow,green,blue,purp,whitepink,largebee,mediumbee,smallblbee,smallgbee,nonbeewasp,hoverflies,butterflies,feedback,state,county, Family, New.Genus, New.Species, Authority, Taxonomic.status)
+  select(end_year,end_month,end_date, end_time,end_week_num,did,student_status,firstobs,loclat,loclong,time,temp,latname,cultivar,bloom,red,orange,yellow,green,blue,purp,whitepink,largebee,mediumbee,smallblbee,smallgbee,nonbeewasp,hoverflies,butterflies,feedback,state,county, Family, New.Genus, New.Species, Authority, Taxonomic.status, genus_and_family)
 
 write.csv(raw_public, "data.csv", row.names=FALSE)

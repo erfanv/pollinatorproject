@@ -1,21 +1,26 @@
 ---
 title: "Southern USA Citizen Science Project Pollinator Analyses"
 author:
-  - Erfan Vafaie^[Extension Program Specialist, Texas A&amp;M AgriLife Extension, 1710 FM N 3053, Overton, TX]
-  - Dr. Mike Merchant^[Extension Specialist, Texas A&amp;M AgriLife Extension]
-  - Dr. Eric Rebek^[Professor, Oklahoma State University]
-  - Dr. Scott Longing^[Assistant Professor of Entomology, Texas Tech University]
-  - Dr. Adam Mitchell^[Assistant Professor of Entomology, Tarleton State University]
+- Erfan Vafaie^[Extension Program Specialist, Texas A&amp;M AgriLife Extension, 1710
+  FM N 3053, Overton, TX]
+- Dr. Mike Merchant^[Extension Specialist, Texas A&amp;M AgriLife Extension]
+- Danielle Dunn^[Extension Demonstration Technician, Texas A&amp;M AgriLife Extension]
+- Dr. Eric Rebek^[Professor, Oklahoma State University]
+- Dr. Scott Longing^[Assistant Professor of Entomology, Texas Tech University]
+- Dr. Adam Mitchell^[Assistant Professor of Entomology, Tarleton State University]
 date: "9/24/2019"
 output:
   html_document:
     collapsed: yes
+    df_print: paged
     smooth_scroll: yes
     toc: yes
     toc_depth: 3
     toc_float: yes
-    df_print: paged
   word_document:
+    toc: yes
+    toc_depth: '3'
+  pdf_document:
     toc: yes
     toc_depth: '3'
 ---
@@ -28,80 +33,29 @@ library(plotly)
 #install.packages("RCurl")
 library(RCurl)
 library(kableExtra)
+library(tidyverse)
 source("packages.R")
 
 #load in data
 data <- read.csv("data.csv",header=TRUE)
 
-#Our custom pie function
-pie2 <- function (x, labels = names(x), edges = 200, radius = 0.8, clockwise = FALSE, 
-          init.angle = if (clockwise) 90 else 0, density = NULL, angle = 45, 
-          col = NULL, border = NULL, lty = NULL, main = NULL, ...) 
-{
-  if (!is.numeric(x) || any(is.na(x) | x < 0)) 
-    stop("'x' values must be positive.")
-  if (is.null(labels)) 
-    labels <- as.character(seq_along(x))
-  else labels <- as.graphicsAnnot(labels)
-  x <- c(0, cumsum(x)/sum(x))
-  dx <- diff(x)
-  nx <- length(dx)
-  plot.new()
-  pin <- par("pin")
-  xlim <- ylim <- c(-1, 1)
-  if (pin[1L] > pin[2L]) 
-    xlim <- (pin[1L]/pin[2L]) * xlim
-  else ylim <- (pin[2L]/pin[1L]) * ylim
-  dev.hold()
-  on.exit(dev.flush())
-  plot.window(xlim, ylim, "", asp = 1)
-  if (is.null(col)) 
-    col <- if (is.null(density)) 
-      c("white", "lightblue", "mistyrose", "lightcyan", 
-        "lavender", "cornsilk")
-  else par("fg")
-  if (!is.null(col)) 
-    col <- rep_len(col, nx)
-  if (!is.null(border)) 
-    border <- rep_len(border, nx)
-  if (!is.null(lty)) 
-    lty <- rep_len(lty, nx)
-  angle <- rep(angle, nx)
-  if (!is.null(density)) 
-    density <- rep_len(density, nx)
-  twopi <- if (clockwise) 
-    -2 * pi
-  else 2 * pi
-  t2xy <- function(t) {
-    t2p <- twopi * t + init.angle * pi/180
-    list(x = radius * cos(t2p), y = radius * sin(t2p))
-  }
-  for (i in 1L:nx) {
-    n <- max(2, floor(edges * dx[i]))
-    P <- t2xy(seq.int(x[i], x[i + 1], length.out = n))
-    polygon(c(P$x, 0), c(P$y, 0), density = density[i], angle = angle[i], 
-            border = border[i], col = col[i], lty = lty[i])
-    P <- t2xy(mean(x[i + 0:1]))
-    lab <- as.character(labels[i])
-    if (!is.na(lab) && nzchar(lab)) {
-      lines(c(1, 1.35) * P$x, c(1, 1.35) * P$y)
-      text(1.5 * P$x, 1.5 * P$y, labels[i], xpd = TRUE, 
-           adj = ifelse(P$x < 0, 1, 0), ...)
-    }
-  }
-  title(main = main, ...)
-  invisible(NULL)
-}
+#Order the data by year, month, and date
+data <- data[order(data$end_year,data$end_month,data$end_date),]
 ```
-#Introduction
+#1. Introduction
 This data set is a summary of data collected by master gardeners, master naturalists, gardeners, students, and other pollinator enthusiasts in the Southern USA, as a part of a citizen science project. For details on the method of data collection, visit <a href="https://sixleggedaggie.com/pollinator-project" target="_blank">the pollinator project webpage</a>
 
-The data summarized below is for data collected between `r data[1,1]` and `r data[nrow(data),1]`. 
+The data summarized below is for data collected between `r paste(data$end_month[1],data$end_date[1],data$end_year[1],sep="-")` and `r paste(data$end_month[nrow(data)],data$end_date[nrow(data)],data$end_year[nrow(data)],sep="-")`. 
 
 ```{r dataimport, include=FALSE}
 #Data with full taxonomic information
 fulltax <- data %>%
+  filter(genus_and_family=="Yes")
+
+species_info <- data %>%
   filter(Taxonomic.status=="Accepted")
+
+num_species <- length(unique(species_info$New.Species))
 ```
 First, let's take a look at a good part of the dataset (first 50 rows). This dataset includes a total of `r nrow(data)` observations and `r length(data)` columns of information. That's a whole lot of data to go through - feel free to peruse through it below.
 ```{r fulldataset, echo=FALSE}
@@ -126,8 +80,8 @@ A few columns explained for your convenience:
 * __largebee to butterflies__: The total number of each of those types of pollinators seen during the 60-second observation. Refer to the <a href=https://sixleggedaggie.com/pollinator-project" target="_blank">pollinator project website</a> for more details on the categories. 
 * __Family and New.Genus:__ These two values were automatically generated by comparing the "latname" column against the <a href="https://theplantlist.org" target="_blank">theplantlist.org</a> database, and returning closest matches. Where there is not a good match, the original latname is simply echoed back into the New.Genus column and the __Taxonomic.Status__ is returned back as anything but "Approved".
 
-##Table 1. Plant Families
-Below is the full list of plant families and frequency of observations, where the actual latin name was verified by theplantlist.org. The total number of observations where the latin name was verified is `r nrow(fulltax)` out of the total `r nrow(data)`.
+##Table 1.1. Plant Families
+Below is the full list of plant families and frequency of observations, where the actual latin name was verified by theplantlist.org. The total number of observations where the genus and family name was verified is `r nrow(fulltax)` out of the total `r nrow(data)`. We also have a total of `r nrow(species_info)` observations with plant information down to species, representing a total of `r num_species` different species.
 
 ```{r basicanalytics, echo=FALSE}
 families <- as.data.frame(table(fulltax$Family))
@@ -151,7 +105,7 @@ kable(families, format = "html", escape = FALSE, digits=2, caption = "Table 1. F
 
 You can click on the links for any given family name, and it will take you to a wikipedia page on the specified plant family. Our study included a total of `r nrow(families)` plant families.
 
-##Figure 1. Pie of Plant Families
+##Figure 1.1. Pie of Plant Families
 Pie chart of percentage (and frequency) of observations on a specific plant family. Note that frequency of observations has nothing to do with pollinator attractiveness. At this point, we're just summarizing what was looked at! This is practically the exacty same data as above, but displayed in a pie chart for better illustrative purposes.
 ```{r piechart_family, echo=FALSE}
 pfam <- fulltax %>%
@@ -167,7 +121,7 @@ pfam
 
 ```
 
-##Table 2. Pie of Plant Genus
+##Figure 1.2. Pie of Plant Genus
 Pie chart of percentage (and frequency) of observations on a specific plant genus Note that frequency of observations has nothing to do with pollinator attractiveness. At this point, we're just summarizing what was looked at!
 ```{r piechart_genus, echo=FALSE}
 pgenus <- fulltax[1:20,] %>%
@@ -182,6 +136,361 @@ pgenus <- fulltax[1:20,] %>%
 pgenus
 ```
 
+##Figure 1.3. Temperatures
+The following figures help us visualize some of the data for any outliers/erroneous datapoints.
+Below is a Box-whisker plot of all inputted temperature data, in F
+```{r whiskers, echo=FALSE}
+boxplot(data$temp, main="Box and whisker plot of temperature data", xlab="check", ylab="Temperature, in F")
+```
+
+##Figure 1.4. Pollinator Box-Whisker
+
+Below is a box-whisker plot for all of the separate polliantor categories recorded in our dataset.
+```{r whiskers_pollinators}
+p <- melt(data, id.vars=c("state"), measure.vars=c("largebee","mediumbee","smallblbee","smallgbee","nonbeewasp","hoverflies","butterflies"),na.rm=TRUE)
+
+ggplot(p, aes(x = variable, y=value)) +
+  geom_boxplot() +
+  ggtitle("Box-whisker plots of all inputted pollinator data") +
+  ylim(0,60) +
+  theme_classic() 
+
+#ggplot(data, aes(x=smallblbee)) +
+#  geom_histogram(binwidth=5)
+```
+
+#2. Flower Color
+Observers were asked to check off all of the colors present in the flowers being observed during the 60-second count. Any given observation could have had more than one color associated with it.
+
+## Table 2.1 Flower Color Frequency
+Below is a table of frequency each color flower was reported.
+```{r Flower_Color_table}
+col_labels <- c("Red","Orange","Yellow","Green","Blue/Cyan","Purple/Indigo/Violet","White/Pink")
+col <- c("red","orange","yellow","green","blue","purp","whitepink")
+
+table_colors <- data %>%
+  select(red, orange, yellow, green, blue, purp, whitepink) %>%
+  summarize( red = sum(red),
+             orange = sum(orange),
+             yellow = sum(yellow),
+             green = sum(green),
+             blue = sum(blue),
+             purple = sum(purp),
+             whitep = sum(whitepink))
+
+names(table_colors) <- col_labels
+
+kable(table_colors, digits=2, caption = "Table 1. All flower colors reported and total frequency observed in the dataset") %>%
+  kable_styling(fixed_thead = T, bootstrap_options = c("striped", "hover", "responsive"), full_width = F)
+
+```
+
+##Table 2.2. Pollinator Counts
+
+```{r Pollinator_table, warning=FALSE}
+pollinators <- c("Large bees, bumblebees","Medium bees, honeybees","Small black bees","Small green bees","Non-bee, wasps","Hoverflies, bee-like flies","Butterflies & moths")
+
+pol <- c("largebee","mediumbee","smallblbee","smallgbee","nonbeewasp","hoverflies","butterflies")
+
+
+stand.error <- function(x){
+  sd(x, na.rm=TRUE)/sqrt(length(x))
+}
+
+table_pollinators <- data %>%
+  select(largebee, mediumbee, smallblbee, smallgbee, nonbeewasp, hoverflies, butterflies) %>%
+  summarize_all(funs(mean(., na.rm = TRUE),stand.error))
+
+table_pollinators <- as.data.frame(table_pollinators)
+
+table_pollinators$se_largebee <- paste(as.character(round(table_pollinators$largebee_mean,2)), "\u00b1", as.character(round(table_pollinators$largebee_stand.error,2)))
+
+table_pollinators$se_mediumbee <- paste(as.character(round(table_pollinators$mediumbee_mean,2)), "\u00b1", as.character(round(table_pollinators$mediumbee_stand.error,2)))
+
+table_pollinators$se_smallblbee <- paste(as.character(round(table_pollinators$smallblbee_mean,2)), "\u00b1", as.character(round(table_pollinators$smallblbee_stand.error,2)))
+
+table_pollinators$se_smallgbee <- paste(as.character(round(table_pollinators$smallgbee_mean,2)), "\u00b1", as.character(round(table_pollinators$smallgbee_stand.error,2)))
+
+table_pollinators$se_nonbeewasp <- paste(as.character(round(table_pollinators$nonbeewasp_mean,2)), "\u00b1", as.character(round(table_pollinators$nonbeewasp_stand.error,2)))
+
+table_pollinators$se_hoverflies <- paste(as.character(round(table_pollinators$hoverflies_mean,2)), "\u00b1", as.character(round(table_pollinators$hoverflies_stand.error,2)))
+
+table_pollinators$se_butterflies <- paste(as.character(round(table_pollinators$butterflies_mean,2)), "\u00b1", as.character(round(table_pollinators$butterflies_stand.error,2)))
+
+table_pollinators <- table_pollinators %>%
+  select(se_largebee, se_mediumbee, se_smallblbee, se_smallgbee, se_nonbeewasp, se_hoverflies, se_butterflies)
+
+names(table_pollinators) <- pollinators
+
+kable(table_pollinators, digits=2, caption = "Table 2. Mean pollinator counts (+/- SE) per observation") %>%
+  kable_styling(fixed_thead = T, bootstrap_options = c("striped", "hover", "responsive"), full_width = F)
+
+```
+
+## Table 2.3. Pollinator Visits by Flower Color
+Below is summarized the mean visits of each pollinator group by flower color, both as a table and a graph.
+```{r Flower_Color_table_big}
+data_col_tot <- data %>%
+  select(red,orange,yellow,green, blue, purp, whitepink, largebee, mediumbee, smallblbee, smallgbee, nonbeewasp, hoverflies, butterflies) %>%
+  gather(color, present, red:whitepink) %>%
+  gather(pollinator, quantity, largebee:butterflies)
+
+data_col_summ <- data_col_tot %>%
+  group_by(color,pollinator) %>%
+  filter(present==1) %>%
+  summarize(mean = mean(quantity, na.rm=TRUE),
+            se = stand.error(quantity),
+            col_tot = sum(present),
+            n = n())
+
+data_present <- data_col_tot %>%
+  group_by(color,pollinator) %>%
+  filter(quantity>0) %>%
+  filter(present==1) %>%         
+  summarize(tot_present = n())
+
+data_col_summ$tot_present <- data_present$tot_present
+
+data_col_summ$prop <- data_col_summ$tot_present/data_col_summ$col_tot
+
+data_col_summ$se_pollinator <- paste(as.character(round(data_col_summ$mean,2)), "\u00b1", as.character(round(data_col_summ$se,2)))
+
+data_col <- data_col_summ %>%
+  select(color, col_tot, pollinator,se_pollinator,prop)
+
+data_col <- as.data.frame(data_col)
+
+data_col$color <- factor(data_col$color, 
+                            levels=col,
+                            labels=col_labels)
+
+data_col$pollinator <- factor(data_col$pollinator,
+                                 levels=pol,
+                                 labels=pollinators)
+
+names(data_col) <- c("Color","N","Pollinator Type","Mean +/- SE","Proportion")
+
+
+kable(data_col, digits=2, caption = "Table 3. Mean pollinator counts (+/- SE) and proportion by pollinator type and flower color") %>%
+  kable_styling(fixed_thead = T, bootstrap_options = c("striped", "hover", "responsive"), full_width = F) %>%
+  column_spec(1, bold = T) %>%
+  collapse_rows(columns = 1:2, valign = "middle") %>%
+  footnote(general = "N represents the total number of flower observations of a particular color")
+
+```
+
+## Figure 2.1. Pollinator Visits by Flower Color
+```{r Flower_color_graph}
+data_col_summ$color <- factor(data_col_summ$color,
+                              levels=col,
+                              labels=col_labels)
+
+data_col_summ$pollinator <- factor(data_col_summ$pollinator,
+                                 levels=pol,
+                                 labels=pollinators)
+
+p <- ggplot(data_col_summ, aes(x=pollinator,y=mean, fill=color)) +
+  geom_bar(stat="identity", position=position_dodge(), color="black") +
+  scale_fill_manual(values=c("red","orange","yellow","green","blue","purple","pink")) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se),width=.2, position=position_dodge(0.9)) +
+  theme_classic() +
+  theme(axis.text.x= element_text(angle = 65, hjust = 1)) +
+  labs(x="Pollinator Type",y="Mean +/- SE") +
+  guides(fill=guide_legend(title="Flower Color"))
+
+p
+
+```
+
+```{r boxwhiskerbycolor, include=FALSE}
+#Graph(s) below not included. Data heavily zero-inflated. May not be valuable.
+data_col_tot_largebee <- data_col_tot %>%
+  filter(pollinator=="largebee" & present=="1")
+
+data_col_tot_largebee$color <-factor(data_col_tot_largebee$color,
+                              levels=col,
+                              labels=col_labels)
+
+p <- ggplot(data_col_tot_largebee, aes(x=color, y=quantity, fill=color)) +
+  geom_boxplot(aes(fill=color))
+
+p
+```
+
+#3. Visits by Plant
+For every observation, latin name was recorded. As mentioned before, not all latin names were validated. Below are tables that summarize pollinator visits by plant taxonomy.
+
+##Table 3.1 Visit by Plant Species
+
+
+```{r visitplantspecies, echo=FALSE}
+
+#For species level data, Taxonomic.status needs to be Accepted or Synonym. For Genus and Family level data, genus_and_family needs to be Yes.
+data$New.Species <- as.character(data$New.Species)
+data$New.Genus <- as.character(data$New.Genus)
+data$Family <- as.character(data$Family)
+
+data_species <- data %>%
+  filter(Taxonomic.status=="Accepted" | Taxonomic.status=="Synonym")
+
+data_genus <- data %>%
+  filter(genus_and_family=="Yes")
+
+data_species$fullspecies <- paste(data_species$New.Genus, data_species$New.Species,sep=" ")
+data_species$fullspecies <- str_to_sentence(data_species$fullspecies, locale ="en")
+data_genus$New.Genus <- str_to_sentence(data_genus$New.Genus, locale ="en")
+data_species$New.Genus <- str_to_sentence(data_species$New.Genus, locale ="en")
+
+data_species_table <- data_species %>%
+  group_by(fullspecies, Family, New.Genus) %>%
+  select(largebee, mediumbee, smallblbee, smallgbee, nonbeewasp, hoverflies, butterflies) %>%
+  summarize_all(funs(mean(., na.rm = TRUE),stand.error,n()))
+
+data_species_table <- as.data.frame(data_species_table)
+
+data_species_table$se_largebee <- paste(as.character(round(data_species_table$largebee_mean,2)), "\u00b1", as.character(round(data_species_table$largebee_stand.error,2)))
+
+data_species_table$se_mediumbee <- paste(as.character(round(data_species_table$mediumbee_mean,2)), "\u00b1", as.character(round(data_species_table$mediumbee_stand.error,2)))
+
+data_species_table$se_smallblbee <- paste(as.character(round(data_species_table$smallblbee_mean,2)), "\u00b1", as.character(round(data_species_table$smallblbee_stand.error,2)))
+
+data_species_table$se_smallgbee <- paste(as.character(round(data_species_table$smallgbee_mean,2)), "\u00b1", as.character(round(data_species_table$smallgbee_stand.error,2)))
+
+data_species_table$se_nonbeewasp <- paste(as.character(round(data_species_table$nonbeewasp_mean,2)), "\u00b1", as.character(round(data_species_table$nonbeewasp_stand.error,2)))
+
+data_species_table$se_hoverflies <- paste(as.character(round(data_species_table$hoverflies_mean,2)), "\u00b1", as.character(round(data_species_table$hoverflies_stand.error,2)))
+
+data_species_table$se_butterflies <- paste(as.character(round(data_species_table$butterflies_mean,2)), "\u00b1", as.character(round(data_species_table$butterflies_stand.error,2)))
+
+data_species_table <- data_species_table %>%
+  select(Family, New.Genus, fullspecies, se_largebee, se_mediumbee, se_smallblbee, se_smallgbee, se_nonbeewasp, se_hoverflies, se_butterflies, butterflies_n)
+
+names(data_species_table) <- c("Family","Genus","Species", pollinators, "N")
+
+for(i in 1:length(data_species_table)){
+  data_species_table$family_urls[i] <- paste0("https://en.wikipedia.org/wiki/",data_species_table$Family[i])
+}
+
+for(i in 1:length(data_species_table)){
+  data_species_table$genus_urls[i] <- paste0("https://en.wikipedia.org/wiki/",data_species_table$New.Genus[i])
+}
+
+for(i in 1:length(data_species_table)){
+  data_species_table$species_urls[i] <- paste0("https://en.wikipedia.org/wiki/",data_species_table$Species[i])
+}
+
+data_species_table <- data_species_table %>% 
+  mutate(Family=paste("<a href=\"",family_urls,"\">",Family,"</a>",sep="")) %>%
+  mutate(Genus=paste("<a href=\"",genus_urls,"\">",Genus,"</a>",sep="")) %>%
+  mutate(Species=paste("<a href=\"",species_urls,"\">",Species,"</a>",sep="")) %>%
+  select(-c(12:14))
+
+data_species_table <- data_species_table[order(data_species_table$Family, data_species_table$Genus, data_species_table$Species),]
+
+kable(data_species_table, format = "html", escape = FALSE, digits=2, row.names=FALSE, caption = "Table 1. Mean pollinator counts (+/- SE) species of plant observed") %>%
+  kable_styling(fixed_thead = T, bootstrap_options = c("striped", "hover", "responsive"), full_width = F) %>%
+  collapse_rows(columns = 1:2, valign = "middle") %>%
+  footnote(general = "Please use table with caution. Any data with less than 20 N should be taken with a grain of salt, as fewer observations allows for great skewness of the mean.")
+
+
+```
+
+##3.2 Visits by Plant Genus
+```{r visitbygenus, warning=FALSE}
+
+data_genus_table <- data_genus %>%
+  group_by(Family, New.Genus) %>%
+  select(largebee, mediumbee, smallblbee, smallgbee, nonbeewasp, hoverflies, butterflies) %>%
+  summarize_all(funs(mean(., na.rm = TRUE),stand.error,n()))
+
+data_genus_table <- as.data.frame(data_genus_table)
+
+data_genus_table$se_largebee <- paste(as.character(round(data_genus_table$largebee_mean,2)), "\u00b1", as.character(round(data_genus_table$largebee_stand.error,2)))
+
+data_genus_table$se_mediumbee <- paste(as.character(round(data_genus_table$mediumbee_mean,2)), "\u00b1", as.character(round(data_genus_table$mediumbee_stand.error,2)))
+
+data_genus_table$se_smallblbee <- paste(as.character(round(data_genus_table$smallblbee_mean,2)), "\u00b1", as.character(round(data_genus_table$smallblbee_stand.error,2)))
+
+data_genus_table$se_smallgbee <- paste(as.character(round(data_genus_table$smallgbee_mean,2)), "\u00b1", as.character(round(data_genus_table$smallgbee_stand.error,2)))
+
+data_genus_table$se_nonbeewasp <- paste(as.character(round(data_genus_table$nonbeewasp_mean,2)), "\u00b1", as.character(round(data_genus_table$nonbeewasp_stand.error,2)))
+
+data_genus_table$se_hoverflies <- paste(as.character(round(data_genus_table$hoverflies_mean,2)), "\u00b1", as.character(round(data_genus_table$hoverflies_stand.error,2)))
+
+data_genus_table$se_butterflies <- paste(as.character(round(data_genus_table$butterflies_mean,2)), "\u00b1", as.character(round(data_genus_table$butterflies_stand.error,2)))
+
+data_genus_table <- data_genus_table %>%
+  select(Family, New.Genus, se_largebee, se_mediumbee, se_smallblbee, se_smallgbee, se_nonbeewasp, se_hoverflies, se_butterflies, butterflies_n)
+
+names(data_genus_table) <- c("Family","Genus", pollinators, "N")
+
+for(i in 1:length(data_genus_table)){
+  data_genus_table$family_urls[i] <- paste0("https://en.wikipedia.org/wiki/",data_genus_table$Family[i])
+}
+
+for(i in 1:length(data_genus_table)){
+  data_genus_table$genus_urls[i] <- paste0("https://en.wikipedia.org/wiki/",data_genus_table$New.Genus[i])
+}
+
+data_genus_table <- data_genus_table %>% 
+  mutate(Family=paste("<a href=\"",family_urls,"\">",Family,"</a>",sep="")) %>%
+  mutate(Genus=paste("<a href=\"",genus_urls,"\">",Genus,"</a>",sep="")) %>%
+  select(-c(11:12))
+
+data_genus_table <- data_genus_table[order(data_genus_table$Family, data_genus_table$Genus),]
+
+kable(data_genus_table, format = "html", escape = FALSE, digits=2, row.names=FALSE, caption = "Table 2. Mean pollinator counts (+/- SE) by plant Genus" ) %>%
+  kable_styling(fixed_thead = T, bootstrap_options = c("striped", "hover", "responsive"), full_width = F) %>%
+  collapse_rows(columns = 1, valign = "middle") %>%
+  footnote(general = "Please use table with caution. Any data with less than 20 N should be taken with a grain of salt, as fewer observations allows for great skewness of the mean.")
+
+```
+
+##3.3 Visits by Plant Family
+```{r visitbyfamily, warning=FALSE}
+
+data_genus_table <- data_genus %>%
+  group_by(Family) %>%
+  select(largebee, mediumbee, smallblbee, smallgbee, nonbeewasp, hoverflies, butterflies) %>%
+  summarize_all(funs(mean(., na.rm = TRUE),stand.error,n()))
+
+data_genus_table <- as.data.frame(data_genus_table)
+
+data_genus_table$se_largebee <- paste(as.character(round(data_genus_table$largebee_mean,2)), "\u00b1", as.character(round(data_genus_table$largebee_stand.error,2)))
+
+data_genus_table$se_mediumbee <- paste(as.character(round(data_genus_table$mediumbee_mean,2)), "\u00b1", as.character(round(data_genus_table$mediumbee_stand.error,2)))
+
+data_genus_table$se_smallblbee <- paste(as.character(round(data_genus_table$smallblbee_mean,2)), "\u00b1", as.character(round(data_genus_table$smallblbee_stand.error,2)))
+
+data_genus_table$se_smallgbee <- paste(as.character(round(data_genus_table$smallgbee_mean,2)), "\u00b1", as.character(round(data_genus_table$smallgbee_stand.error,2)))
+
+data_genus_table$se_nonbeewasp <- paste(as.character(round(data_genus_table$nonbeewasp_mean,2)), "\u00b1", as.character(round(data_genus_table$nonbeewasp_stand.error,2)))
+
+data_genus_table$se_hoverflies <- paste(as.character(round(data_genus_table$hoverflies_mean,2)), "\u00b1", as.character(round(data_genus_table$hoverflies_stand.error,2)))
+
+data_genus_table$se_butterflies <- paste(as.character(round(data_genus_table$butterflies_mean,2)), "\u00b1", as.character(round(data_genus_table$butterflies_stand.error,2)))
+
+data_genus_table <- data_genus_table %>%
+  select(Family, se_largebee, se_mediumbee, se_smallblbee, se_smallgbee, se_nonbeewasp, se_hoverflies, se_butterflies, butterflies_n)
+
+names(data_genus_table) <- c("Family", pollinators, "N")
+
+for(i in 1:length(data_genus_table)){
+  data_genus_table$family_urls[i] <- paste0("https://en.wikipedia.org/wiki/",data_genus_table$Family[i])
+}
+
+data_genus_table <- data_genus_table %>% 
+  mutate(Family=paste("<a href=\"",family_urls,"\">",Family,"</a>",sep="")) %>%
+  select(-c(10))
+
+data_genus_table <- data_genus_table[order(data_genus_table$Family),]
+
+kable(data_genus_table, format = "html", escape = FALSE, digits=2, row.names=FALSE, caption = "Table 3. Mean pollinator counts (+/- SE) by plant Family" ) %>%
+  kable_styling(fixed_thead = T, bootstrap_options = c("striped", "hover", "responsive"), full_width = F) %>%
+  footnote(general = "Please use table with caution. Any data with less than 20 N should be taken with a grain of salt, as fewer observations allows for great skewness of the mean.")
+
+```
+
 ```{r uploadfile, include=FALSE}
-source("file_upload.R")
+#source("file_upload.R")
 ```
