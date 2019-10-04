@@ -455,6 +455,7 @@ data_genus_table <- data_genus %>%
   summarize_all(funs(mean(., na.rm = TRUE),stand.error,n()))
 
 data_genus_table <- as.data.frame(data_genus_table)
+data_genus_fig <- as.data.frame(data_genus_table)
 
 data_genus_table$se_largebee <- paste(as.character(round(data_genus_table$largebee_mean,2)), "\u00b1", as.character(round(data_genus_table$largebee_stand.error,2)))
 
@@ -488,6 +489,40 @@ data_genus_table <- data_genus_table[order(data_genus_table$Family),]
 kable(data_genus_table, format = "html", escape = FALSE, digits=2, row.names=FALSE, caption = "Table 3. Mean pollinator counts (+/- SE) by plant Family" ) %>%
   kable_styling(fixed_thead = T, bootstrap_options = c("striped", "hover", "responsive"), full_width = F) %>%
   footnote(general = "Please use table with caution. Any data with less than 20 N should be taken with a grain of salt, as fewer observations allows for great skewness of the mean.")
+
+```
+
+##3.4. Visits by Plant Family Fig.
+Removed any plant families with less than 10 observations. After summarizing data to the family level (mean visits by pollinator type), I then summarized all means across all pollinator types into a single mean (and standard error) and plotted below.
+```{r next}
+data_genus_fig2 <- data_genus_fig %>%
+  select(Family:largebee_n) %>%
+  filter(largebee_n>20) %>%
+  gather(key = poll_type,
+         value = mean,
+         dplyr::ends_with('_mean'),
+         dplyr::ends_with('_stand.error')) %>%
+  separate(poll_type,
+           into=c('poll','type'),
+           sep="_") %>%
+  spread(type,mean)
+
+names(data_genus_fig2) <- c("Family","count","type","themean","standarderror")
+
+all_poll <- data_genus_fig2 %>%
+  group_by(Family, count) %>%
+  summarize(mean = mean(themean, na.rm=TRUE),
+            se = stand.error(themean),
+            n = n())
+
+ggplot(all_poll, aes(x=as.factor(Family), y=mean)) +
+  geom_bar(position="dodge", stat="identity", fill="steelblue") +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.5, position=position_dodge(0.9)) +
+  ylab("Mean for all pollinator visitors +/- SE") +
+  xlab("Plant Family") +
+  ggtitle("Mean pollinator visits by plant family +/- SE") +
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 ```
 
