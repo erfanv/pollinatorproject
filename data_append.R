@@ -144,7 +144,8 @@ all_sorted_fulltax <- TPL(new_data$latname, corr = TRUE, diffchar = 2, max.dista
 
 new_data <- cbind(new_data,all_sorted_fulltax)
 
-complete_set <- rbind(new_data,old_data)
+#Chagned from rbind to bind_rows from dplyr, due to slight differences in number of columns
+complete_set <- bind_rows(new_data,old_data)
 
 #Some of the data is only to genus level. We want to still collect Family and Genus-level information from those observations. We can do that by searching for any latnames with "sp." in them, then match the first word (genus) from that observation with a complete observation from the dataset and copy over the Family and Genus.
 
